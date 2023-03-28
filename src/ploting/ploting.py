@@ -218,10 +218,12 @@ class ACFPlot(Plot):
         """
         title = kwargs.pop('title', "")
         partial = kwargs.pop('partial', False)
+        zero = kwargs.pop('zero', False)
         
         plot_f = plot_pacf if partial else plot_acf
-        self.fig = plot_f(y, ax=self.ax)
+        self.fig = plot_f(y, ax=self.ax, zero=zero)
         self.ax.set_title(title, fontdict=self.title_font_dict)
+        self.ax.figure.set_size_inches(self.w, self.h)
         
         if self.legend:
             plt.legend()
