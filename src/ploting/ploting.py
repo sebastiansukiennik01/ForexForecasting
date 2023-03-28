@@ -7,6 +7,8 @@ import seaborn as sns
 from typing import Iterable
 import datetime as dt
 
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
 from abc import ABC, abstractmethod
 
 
@@ -182,7 +184,6 @@ class HistPlot(Plot):
         Plots data onto provided axes. If none axes provided new one is created.
         Defualt style is set to 'fivethirtyeight' but can be changed via kwargs argument.
         args:
-            x : iteravale data ploted onto X axis
             y : iteravale data ploted onto Y axis
         return : ax with ploted linear data
         """
@@ -193,7 +194,6 @@ class HistPlot(Plot):
 
         self.ax.hist(y, bins=bins)
         self.ax.set_title(title, fontdict=self.title_font_dict)
-        # self.ax.figure.set_size_inches(self.w, self.h)
         self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
         self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
         
@@ -203,6 +203,31 @@ class HistPlot(Plot):
         self._save_figure(title)
 
         return self.ax
+    
+
+class ACFPlot(Plot):
+    def __init__(self, legend: bool = True, w: int = 10, h: int = 4, default_style: str = "default", **kwargs) -> None:
+        super().__init__(legend, w, h, default_style, **kwargs)
+        
+    def plot(self, y: Iterable, **kwargs) -> plt.axes:
+        """
+        Plots Autocorellation Function graph
+        args:
+            y : iteravale data ploted onto Y axis
+        return : ax with ploted linear data
+        """
+        title = kwargs.pop('title', "")
+        partial = kwargs.pop('partial', False)
+        
+        plot_f = plot_pacf if partial else plot_acf
+        self.fig = plot_f(y, ax=self.ax)
+        self.ax.set_title(title, fontdict=self.title_font_dict)
+        
+        if self.legend:
+            plt.legend()
+        self._save_figure(title)
+        return self.ax
+    
 
 
 def _check_correct_input(x: Iterable, y_s: Iterable, labels: list) -> bool:
