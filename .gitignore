@@ -1,0 +1,7 @@
+data_backup/
+excel/
+images/
+notebooks/
+.DS_Store
+__pycache__/
+data/
