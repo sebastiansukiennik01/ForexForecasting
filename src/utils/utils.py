@@ -63,8 +63,8 @@ def add_variables(ohlc: pd.DataFrame) -> pd.DataFrame:
 
     returns : pandas dataframe
     """
-    ohlc = ohlc.loc[~ohlc['Close'].isna(), :]
-    
+    ohlc = ohlc.loc[~ohlc["Close"].isna(), :]
+
     ohlc = ohlc.assign(
         # roi_1, roi_3, roi_5, roi_10, roi_15, roi_20
         roi_1=ohlc["Close"].pct_change(1),
@@ -79,8 +79,8 @@ def add_variables(ohlc: pd.DataFrame) -> pd.DataFrame:
         vol_change_2=ohlc["Volume"].pct_change(2),
         vol_change_3=ohlc["Volume"].pct_change(3),
         # SMA-50 and SMA-200
-        sma_50=ohlc['Close'].rolling(50).mean(),
-        sma_200=ohlc['Close'].rolling(200).mean(),
+        sma_50=ohlc["Close"].rolling(50).mean(),
+        sma_200=ohlc["Close"].rolling(200).mean(),
         # target_value: next close, target_direction: whether 12'th close from now is over/under current closing price
         target_value=ohlc["Close"].shift(-1),
         target_direction=(ohlc["Close"].pct_change().shift(-12) > 0).astype(int),
@@ -104,7 +104,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     """
     data.replace([np.inf, -np.inf], np.nan, inplace=True)
     data = data.loc[~data.isna().any(axis=1), :]
-    
+
     return data
 
 
@@ -131,9 +131,11 @@ def _encode_hour_of_day(ohlc: pd.DataFrame) -> pd.DataFrame:
     )
 
     rbf.fit(ohlc)
-    res = pd.DataFrame(index=ohlc.index, data=rbf.transform(ohlc)).rename(
-        lambda x: f"hour_{x}", axis=1
-    ).astype(np.float32)
+    res = (
+        pd.DataFrame(index=ohlc.index, data=rbf.transform(ohlc))
+        .rename(lambda x: f"hour_{x}", axis=1)
+        .astype(np.float32)
+    )
 
     return res
 
@@ -156,9 +158,11 @@ def _encode_day_of_week(ohlc: pd.DataFrame) -> pd.DataFrame:
     )
 
     rbf.fit(ohlc)
-    res = pd.DataFrame(index=ohlc.index, data=rbf.transform(ohlc)).rename(
-        lambda x: f"weekday_{x}", axis=1
-    ).astype(np.float32)
+    res = (
+        pd.DataFrame(index=ohlc.index, data=rbf.transform(ohlc))
+        .rename(lambda x: f"weekday_{x}", axis=1)
+        .astype(np.float32)
+    )
 
     return res
 
@@ -177,7 +181,9 @@ def _is_impulse(
     returns : pandas dataframe with impulse column
     """
     ohlc["candle_size"] = ohlc["High"] - ohlc["Low"]
-    pips_range_95_percentile = ohlc["candle_size"].abs().rolling(window).quantile(quantile)
+    pips_range_95_percentile = (
+        ohlc["candle_size"].abs().rolling(window).quantile(quantile)
+    )
     ohlc["impulse"] = (ohlc["candle_size"] > pips_range_95_percentile).astype(np.int0)
 
     return ohlc
