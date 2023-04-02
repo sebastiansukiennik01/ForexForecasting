@@ -54,7 +54,7 @@ def _resample_to_interval(data: pd.DataFrame, interval: str) -> pd.DataFrame:
     )
 
 
-def add_variables(ohlc: pd.DataFrame) -> pd.DataFrame:
+def add_variables(ohlc: pd.DataFrame, both_labels: bool = False) -> pd.DataFrame:
     """
     Adds additional variables to OHLC data.
 
@@ -82,9 +82,12 @@ def add_variables(ohlc: pd.DataFrame) -> pd.DataFrame:
         sma_50=ohlc["Close"].rolling(50).mean(),
         sma_200=ohlc["Close"].rolling(200).mean(),
         # target_value: next close, target_direction: whether 12'th close from now is over/under current closing price
-        target_value=ohlc["Close"].shift(-1),
-        target_direction=(ohlc["Close"].pct_change().shift(-12) > 0).astype(int),
+        target_value=ohlc["Close"].shift(-1)
     )
+    if both_labels:
+        ohlc = ohlc.assign(
+            target_direction=(ohlc["Close"].pct_change().shift(-12) > 0).astype(int),
+        )
 
     hour_of_day = _encode_hour_of_day(ohlc)
     day_of_week = _encode_day_of_week(ohlc)
@@ -102,7 +105,7 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     args:
         data : dataframe
     """
-    data.replace([np.inf, -np.inf], np.nan, inplace=True)
+    data.replace([np.inf, -np.inf, 0.0, 0], np.nan, inplace=True)
     data = data.loc[~data.isna().any(axis=1), :]
 
     return data
@@ -187,3 +190,12 @@ def _is_impulse(
     ohlc["impulse"] = (ohlc["candle_size"] > pips_range_95_percentile).astype(np.int0)
 
     return ohlc
+
+
+def rmse(y_true, y_pred):
+    """
+    Compute Root Mean Square Percentage Error between two arrays.
+    """
+    loss = np.sqrt(np.mean(np.square(((y_true - y_pred) / y_true)), axis=0))
+
+    return loss

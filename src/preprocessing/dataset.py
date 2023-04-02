@@ -15,6 +15,7 @@ from typing import Union
 
 from src.utils.utils import add_variables
 
+
 @dataclass
 class DataSet(object):
     """
@@ -34,6 +35,9 @@ class DataSet(object):
         """
         Divides data into train, validation, test sets using specified ratios
         """
+        # TODO add variables to whole dataset ?!
+        self.data = add_variables(self.data)
+        
         n = self.data.shape[0]
         train_idx = int(n * self._train_r)
         self.train = self.data.iloc[:train_idx].copy()
@@ -78,8 +82,11 @@ class DataSet(object):
         Returns train, validation and test datasets as pandas dataframes.
         """
 
-        return self.get_train(type="dataframe"), self.get_validation(type="dataframe"), self.get_test(type="dataframe")
-        
+        return (
+            self.get_train(type="dataframe"),
+            self.get_validation(type="dataframe"),
+            self.get_test(type="dataframe"),
+        )
 
     def get_tvt_dataset(self) -> tuple[Dataset]:
         """
@@ -136,40 +143,66 @@ class DataSet(object):
         self.train = add_variables(self.train)
         self.validation = add_variables(self.validation)
         self.test = add_variables(self.test)
-        
+
         return self
-    
+
     def normalize(self, how: str, features_only: bool = True) -> DataSet:
         """
         Performs normalization on all datasets. Categorical features are ommited and left as is.
         args:
             how : type of normalization [standarize/min-max]
         """
-        scaler = {
-            "standarize": StandardScaler,
-            "min-max": MinMaxScaler
-        }.get(how, "min-max")
-        
+        scaler = {"standarize": StandardScaler, "min-max": MinMaxScaler}.get(
+            how, "min-max"
+        )
+
         to_scale = set(self.train.columns).difference(self._binary_columns())
         to_scale = to_scale.difference(self.label) if features_only else to_scale
         to_scale = list(to_scale)
         
+        self.test = self._normalize_small_set(self.test, scaler, to_scale)
+        if not self.validation.empty:
+            self.validation[to_scale] = self._normalize_small_set(self.validation[to_scale], scaler, to_scale)
         self.train[to_scale] = scaler().fit_transform(self.train[to_scale])
-        self.validation[to_scale] = scaler().fit_transform(self.validation[to_scale])
-        self.test[to_scale] = scaler().fit_transform(self.test[to_scale])
         
         return self
     
+    def _normalize_small_set(self, _set: pd.DataFrame, scaler: callable, to_scale) -> pd.DataFrame:
+        """
+        Handles normalization if number of samples in set is smaller than 3.
+        args:
+            set : validation/test set which could have to few samples to perform correct normalization
+            scaler : scaler to be used in normalization
+            to_scaler : column names to be normalized
+        returns : normalized set
+        """
+        n = _set.shape[0]
+        if n < 3:
+            if self.validation.empty:
+                temp = pd.concat([self.train.loc[self.train.index[-2:], to_scale].copy(), _set[to_scale].copy()], axis=0)
+            else:
+                temp = pd.concat([self.validation.loc[self.validation.index[-2:]:, _set[to_scale]].copy(), _set.copy()], axis=0)
+            temp = scaler().fit_transform(temp)[-n:]
+        else:
+            temp = scaler().fit_transform(_set[to_scale])
+        _set[to_scale] = temp
+
+        return _set
+        
+
     def clean_data(self) -> DataSet:
         """
         Cleanes dataframe from invalid values.
         """
+        self.data = self.data.replace([np.inf, -np.inf], np.nan).loc[
+            ~self.data.isna().any(axis=1), :
+        ]
         self.train = self.train.replace([np.inf, -np.inf], np.nan).loc[
             ~self.train.isna().any(axis=1), :
         ]
-        self.validation = self.validation.replace(
-            [np.inf, -np.inf], np.nan
-        ).loc[~self.validation.isna().any(axis=1), :]
+        self.validation = self.validation.replace([np.inf, -np.inf], np.nan).loc[
+            ~self.validation.isna().any(axis=1), :
+        ]
         self.test = self.test.replace([np.inf, -np.inf], np.nan).loc[
             ~self.test.isna().any(axis=1), :
         ]
@@ -181,5 +214,5 @@ class DataSet(object):
         Drops binary columns form dataframe
         """
         binary = [c for c in self.train if set(self.train[c].unique()) == set([1, 0])]
-        
+
         return binary
