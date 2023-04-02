@@ -8,7 +8,16 @@ import random
 
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Input, Conv2D, MaxPool2D, Flatten, Dropout, Dense
+from keras.layers import (
+    Input,
+    Conv2D,
+    MaxPool2D,
+    Flatten,
+    Dropout,
+    Dense,
+    Conv1D,
+    MaxPool1D,
+)
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint
 
@@ -58,19 +67,33 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind):
             batch = []
 
 
-def cnnpred_2d(seq_len=60, n_features=82, n_filters=(8, 8, 8), droprate=0.1):
+# def cnnpred_2d(seq_len=60, n_features=82, n_filters=(256, 256, 256), droprate=0.1):
+#     "2D-CNNpred model according to the paper"
+#     model = Sequential(
+#         [
+#             Input(shape=(seq_len, n_features, 1)),
+#             Conv2D(n_filters[0], kernel_size=(1, n_features), activation="sigmoid"),
+#             Conv2D(n_filters[1], kernel_size=(5, 1), activation="sigmoid"),
+#             MaxPool2D(pool_size=(2, 1)),
+#             Flatten(),
+#             Dropout(droprate),
+#             Dense(1, activation="sigmoid"),
+#         ]
+#     )
+#     return model
+
+
+def cnnpred_2d(seq_len=60, n_features=82, n_filters=(256, 256, 256), droprate=0.1):
     "2D-CNNpred model according to the paper"
     model = Sequential(
         [
             Input(shape=(seq_len, n_features, 1)),
-            Conv2D(n_filters[0], kernel_size=(1, n_features), activation="relu"),
-            Conv2D(n_filters[1], kernel_size=(3, 1), activation="relu"),
-            MaxPool2D(pool_size=(2, 1)),
-            Conv2D(n_filters[2], kernel_size=(3, 1), activation="relu"),
-            MaxPool2D(pool_size=(2, 1)),
+            Conv1D(10, kernel_size=16, activation="sigmoid", padding="same"),
             Flatten(),
+            Dense(256, activation="sigmoid"),
+            Dense(128, activation="sigmoid"),
             Dropout(droprate),
-            Dense(1, activation="sigmoid"),
+            Dense(2, activation="softmax"),
         ]
     )
     return model
