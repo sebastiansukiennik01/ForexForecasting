@@ -10,7 +10,7 @@ import copy
 from abc import ABC, abstractmethod
 
 
-class Naive(ABC):
+class Forecast(ABC):
     """
     Abstract Naive class is base class for all naive forecasting classes.
     """
@@ -35,11 +35,11 @@ class Naive(ABC):
     @forecast.setter
     def forecast(self, forecast: np.array) -> None:
         self._forecast = forecast
-        
+
     @property
     def values(self) -> np.array:
         return self._values
-    
+
     @values.setter
     def values(self, values: np.array) -> None:
         if isinstance(values, np.ndarray):
@@ -60,14 +60,14 @@ class Naive(ABC):
     @abstractmethod
     def predict(self) -> np.array:
         ...
-        
+
     def fit(self, train_X: np.ndarray, train_y: np.ndarray) -> Naive:
-        """ For compatibility """
-        ...        
+        """For compatibility"""
+        ...
 
 
 @dataclass
-class NaiveAVG(Naive):
+class NaiveAVG(Forecast):
     _forecast: np.array
     _y: np.array
 
@@ -103,7 +103,7 @@ class NaiveAVG(Naive):
         self.values = values
         self.T = T
         self.h = h
-        
+
         mean_value = np.mean(self.values[-self.T :])
         self.forecast = np.full(self.h, mean_value)
         self.y = np.append(self.values, self.forecast)
@@ -112,7 +112,7 @@ class NaiveAVG(Naive):
 
 
 @dataclass
-class NaiveLast(Naive):
+class NaiveLast(Forecast):
     _forecast: np.array
     _y: np.array
 
@@ -141,7 +141,7 @@ class NaiveLast(Naive):
 
 
 @dataclass
-class NaiveSeasonal(Naive):
+class NaiveSeasonal(Forecast):
     _forecast: np.array
     _y: np.array
     _k: np.array
@@ -190,7 +190,7 @@ class NaiveSeasonal(Naive):
 
 
 @dataclass
-class NaiveDrift(Naive):
+class NaiveDrift(Forecast):
     _forecast: np.array
     _y: np.array
 

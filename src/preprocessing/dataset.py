@@ -37,7 +37,7 @@ class DataSet(object):
         """
         # TODO add variables to whole dataset ?!
         self.data = add_variables(self.data)
-        
+
         n = self.data.shape[0]
         train_idx = int(n * self._train_r)
         self.train = self.data.iloc[:train_idx].copy()
@@ -159,15 +159,19 @@ class DataSet(object):
         to_scale = set(self.train.columns).difference(self._binary_columns())
         to_scale = to_scale.difference(self.label) if features_only else to_scale
         to_scale = list(to_scale)
-        
+
         self.test = self._normalize_small_set(self.test, scaler, to_scale)
         if not self.validation.empty:
-            self.validation[to_scale] = self._normalize_small_set(self.validation[to_scale], scaler, to_scale)
+            self.validation[to_scale] = self._normalize_small_set(
+                self.validation[to_scale], scaler, to_scale
+            )
         self.train[to_scale] = scaler().fit_transform(self.train[to_scale])
-        
+
         return self
-    
-    def _normalize_small_set(self, _set: pd.DataFrame, scaler: callable, to_scale) -> pd.DataFrame:
+
+    def _normalize_small_set(
+        self, _set: pd.DataFrame, scaler: callable, to_scale
+    ) -> pd.DataFrame:
         """
         Handles normalization if number of samples in set is smaller than 3.
         args:
@@ -179,16 +183,29 @@ class DataSet(object):
         n = _set.shape[0]
         if n < 3:
             if self.validation.empty:
-                temp = pd.concat([self.train.loc[self.train.index[-2:], to_scale].copy(), _set[to_scale].copy()], axis=0)
+                temp = pd.concat(
+                    [
+                        self.train.loc[self.train.index[-2:], to_scale].copy(),
+                        _set[to_scale].copy(),
+                    ],
+                    axis=0,
+                )
             else:
-                temp = pd.concat([self.validation.loc[self.validation.index[-2:]:, _set[to_scale]].copy(), _set.copy()], axis=0)
+                temp = pd.concat(
+                    [
+                        self.validation.loc[
+                            self.validation.index[-2:] :, _set[to_scale]
+                        ].copy(),
+                        _set.copy(),
+                    ],
+                    axis=0,
+                )
             temp = scaler().fit_transform(temp)[-n:]
         else:
             temp = scaler().fit_transform(_set[to_scale])
         _set[to_scale] = temp
 
         return _set
-        
 
     def clean_data(self) -> DataSet:
         """

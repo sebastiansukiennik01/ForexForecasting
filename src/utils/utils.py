@@ -63,6 +63,9 @@ def add_variables(ohlc: pd.DataFrame, both_labels: bool = False) -> pd.DataFrame
 
     returns : pandas dataframe
     """
+    if ohlc.empty or ohlc is None:
+        return ohlc
+
     ohlc = ohlc.loc[~ohlc["Close"].isna(), :]
 
     ohlc = ohlc.assign(
@@ -82,7 +85,7 @@ def add_variables(ohlc: pd.DataFrame, both_labels: bool = False) -> pd.DataFrame
         sma_50=ohlc["Close"].rolling(50).mean(),
         sma_200=ohlc["Close"].rolling(200).mean(),
         # target_value: next close, target_direction: whether 12'th close from now is over/under current closing price
-        target_value=ohlc["Close"].shift(-1)
+        target_value=ohlc["Close"].shift(-1),
     )
     if both_labels:
         ohlc = ohlc.assign(
@@ -196,6 +199,7 @@ def rmse(y_true, y_pred):
     """
     Compute Root Mean Square Percentage Error between two arrays.
     """
+    # TODO add percentage error
     loss = np.sqrt(np.mean(np.square(((y_true - y_pred) / y_true)), axis=0))
 
     return loss
