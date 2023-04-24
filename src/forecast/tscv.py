@@ -9,7 +9,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 from typing import Union
 
 from src.preprocessing import DataSet
-from src.utils import rmse
+from src.utils import rmspe
 from src.forecast.naive import NaiveLast, NaiveAVG, NaiveDrift, NaiveSeasonal
 
 
@@ -32,7 +32,7 @@ class TSCV:
         max_train_size: int = None,
         test_size: int = None,
         gap: int = 0,
-        metrics: list[callable] = [mean_absolute_percentage_error, rmse],
+        metrics: list[callable] = [mean_absolute_percentage_error, rmspe],
     ) -> None:
         """
         Takes dataset which is the same for all prediction methods.
@@ -69,7 +69,7 @@ class TSCV:
         returns : calculated errors
         """
 
-        self._clean_data()
+        self._clean_cache()
         self.model = model
         split_metrics = {m.__name__: [] for m in self.metrics}
 
@@ -80,13 +80,17 @@ class TSCV:
             gap=self.gap,
         )
 
+        i = 1
         for train_idx, test_idx in tscv.split(self.dataset.data):
+            print(f"split: {i}/{self.n_splits}")
+            i += 1
+
             train_X, train_y, test_X, test_y = self.split_data(
                 train_idx=train_idx, test_idx=test_idx, **kwargs
             )
 
             # fit model and predict
-            self.model.fit(train_X, train_y)
+            self.model.fit(train_X, train_y, **kwargs)
             predicted_y = self._predict(test_X=test_X, test_y=test_y, **kwargs)
 
             # calculate errors and metrics
@@ -114,7 +118,7 @@ class TSCV:
         norm_type = kwargs.pop("norm_type", "standarize")
 
         # clean missing weekends data before choosing indexes
-        label = self.dataset.label 
+        label = self.dataset.label
 
         # change train, test datasets to new ones
         self.dataset.train = self.dataset.data.iloc[train_idx].copy()
@@ -129,7 +133,13 @@ class TSCV:
             self.dataset.test.loc[:, label],
         )
 
-    def _predict(self, test_X: np.ndarray, test_y: np.ndarray, extend_prediction: bool = True, **kwargs) -> np.ndarray:
+    def _predict(
+        self,
+        test_X: np.ndarray,
+        test_y: np.ndarray,
+        extend_prediction: bool = True,
+        **kwargs,
+    ) -> np.ndarray:
         """
         Fits model using train set with either features or just label values (depeneding on type of model).
         args:
@@ -147,12 +157,13 @@ class TSCV:
 
         return pred_y
 
-    def _clean_data(self) -> None:
+    def _clean_cache(self) -> None:
         """
         Cleans temporary values between TSCV runs.
         """
         self.metric_values = {fe.__name__: [] for fe in self.metrics}
         self.predicted = []
+        self.errors = []
 
     def _calculate_residuals(
         self, train_X: np.ndarray, train_y: np.ndarray, **kwargs
@@ -164,7 +175,9 @@ class TSCV:
             train_y : train set labels
         return : nunmpy array of residuals
         """
-        pred = self._predict(train_X, train_y, extend_prediction=False, **kwargs).flatten()
+        pred = self._predict(
+            train_X, train_y, extend_prediction=False, **kwargs
+        ).flatten()
         y = train_y.values.flatten()
         try:
             resid = np.subtract(y, pred)

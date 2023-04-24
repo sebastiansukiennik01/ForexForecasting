@@ -211,7 +211,6 @@ class NaiveDrift(Forecast):
         """
         self.values = values
         self.h = h
-
         h_periods = np.linspace(1, self.h, self.h)
         h_trend = (self.values[-1] - self.values[0]) / len(self.values)
         self.forecast = np.add(np.multiply(h_trend, h_periods), self.values[-1])

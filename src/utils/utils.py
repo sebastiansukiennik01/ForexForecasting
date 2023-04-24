@@ -11,7 +11,7 @@ def load(currency: str, interval: str) -> pd.DataFrame:
     Loads stock price for currency pair
     args:
         currency : currency pair (e.g. EURUSD)
-    returns : dataframe with OHLCV values for pari
+    returns : dataframe with OHLCV values for pair
     """
     file_path = os.path.join("data", interval, f"{currency}=X.csv")
     if os.path.exists(file_path):
@@ -195,11 +195,10 @@ def _is_impulse(
     return ohlc
 
 
-def rmse(y_true, y_pred):
+def rmspe(y_true, y_pred):
     """
     Compute Root Mean Square Percentage Error between two arrays.
     """
-    # TODO add percentage error
     loss = np.sqrt(np.mean(np.square(((y_true - y_pred) / y_true)), axis=0))
 
     return loss

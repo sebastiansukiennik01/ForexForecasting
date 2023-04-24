@@ -68,7 +68,7 @@ class LinearPlot(Plot):
         """
         xlabel = kwargs.pop("xlabel", None)
         ylabel = kwargs.pop("ylabel", None)
-        title = kwargs.pop("title", "")
+        title = kwargs.pop("title", self.ax.get_title())
 
         self.ax.plot(
             x, y, label=kwargs.pop("label", ""), color=kwargs.pop("color", None)
@@ -232,9 +232,10 @@ class ACFPlot(Plot):
         title = kwargs.pop("title", "")
         partial = kwargs.pop("partial", False)
         zero = kwargs.pop("zero", False)
+        alpha = kwargs.pop("alpha", 0.05)
 
         plot_f = plot_pacf if partial else plot_acf
-        self.fig = plot_f(y, ax=self.ax, zero=zero)
+        self.fig = plot_f(y, ax=self.ax, zero=zero, alpha=alpha)
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
 
