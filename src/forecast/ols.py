@@ -53,7 +53,34 @@ class OLS(Forecast):
         coef = self.model.coef_
 
         return f"const: {const}\n coef: {coef}\n R-score: {self.r_2}"
+    
+    def get_residuals(self, train_X: np.ndarray, train_y: np.ndarray, **kwargs):
+        """ Calculates insample residuals """
+        self.h = self.h if hasattr(self, 'h') else 5
+        first_idx = self.k if hasattr(self, 'k') and self.k else 5
+        
+        train_X = train_X.values
+        train_y = train_y.values
+        pred_y = list(train_y[:first_idx].flatten())
+        
+        [
+            pred_y.extend(self._fit_predict(train_X, train_y, i))
+            for i in range(first_idx, train_y.shape[0], self.h)
+        ]
+        
+        # calc resid and insample prediction
+        self.pred_insample = pred_y[:len(train_y)]
+        self.residuals = np.subtract(train_y.flatten(), self.pred_insample)
 
+    def _fit_predict(self, train_X: np.ndarray, train_y: np.ndarray, i: int) -> np.ndarray:
+        temp_train_X = train_X[:i]
+        temp_train_y = train_y[:i]
+        temp_test_X = train_X[i:i+self.h]
+        print(temp_train_y.shape)
+        
+        self.fit(train_X=temp_train_X, train_y=temp_train_y)
+        
+        return self.predict(temp_test_X)
 
 class OLSS(Forecast):
     """

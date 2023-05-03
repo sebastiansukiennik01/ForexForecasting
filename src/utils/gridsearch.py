@@ -55,13 +55,13 @@ class GridSearch:
         """
 
         combinations = self._get_params_combinations()
-        with Pool(processes=self.p_count)  as pool:
-            pool.map(self._run, combinations)
+        # with Pool(processes=self.p_count)  as pool:
+        #     pool.map(self._run, combinations)
         
-        # for comb in combinations:
-        #     results = self.tscv.run(self.model, **comb)
-        #     self._save_results(results=results,
-        #                        combination=comb)
+        for comb in combinations:
+            results = self.tscv.run(self.model, **comb)
+            self._save_results(results=results,
+                               combination=comb)
             
     def _run(self, comb: dict) -> None:
         results = self.tscv.run(self.model, **comb)
@@ -73,7 +73,8 @@ class GridSearch:
         Appends to or creates a file with sorted results.
         """
         f_path = self._get_file_path()
-        curr_results = pd.DataFrame(results | combination, index=[0])
+        res = {f"{k}_sample": v  for k, v in results[0].items()} | results[1] | combination
+        curr_results = pd.DataFrame(res, index=[0])
         
         if os.path.exists(f_path):
             pd.concat([pd.read_csv(f_path, index_col=[0]), curr_results], 

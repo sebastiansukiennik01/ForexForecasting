@@ -18,6 +18,7 @@ class Forecast(ABC):
     _forecast: np.array
     _y: np.array
     _values: np.array
+    _resid: np.ndarray
 
     def __init__(self, h: int) -> None:
         """
@@ -56,15 +57,44 @@ class Forecast(ABC):
     @y.setter
     def y(self, y: np.array) -> None:
         self._y = y
+        
+    @property
+    def forecast(self) -> np.array:
+        return self._resid
+
+    @forecast.setter
+    def forecast(self, resid: np.array) -> None:
+        self._resid = resid
 
     @abstractmethod
     def predict(self) -> np.array:
         ...
 
-    def fit(self, train_X: np.ndarray, train_y: np.ndarray) -> Naive:
+    def fit(self, train_X: np.ndarray, train_y: np.ndarray, **kwargs) -> Forecast:
         """For compatibility"""
         ...
+        # first_idx = self.k if self.k else 5
+        # pred_y = np.array(train_y[:first_idx])
+        
+        # for i in range(first_idx, train_y.shape[0], self.h):
+        #     pred_y = np.append(pred_y, self.predict(train_y[:i]))
+            
+        # # calc resid
+        # self.pred_insample = pred_y[:len(train_y)]
+        # self.residuals = np.subtract(train_y.values.flatten(), self.pred_insample)
 
+    def get_residuals(self, train_y: np.ndarray, **kwargs):
+        """ Calculates insample residuals """
+        first_idx = self.k if hasattr(self, 'k') and self.k else 5
+        pred_y = np.array(train_y[:first_idx])
+        
+        for i in range(first_idx, train_y.shape[0], self.h):
+            print(f"{i}/{train_y.shape[0]}")
+            pred_y = np.append(pred_y, self.predict(train_y[:i]))
+            
+        # calc resid and insample prediction
+        self.pred_insample = pred_y[:len(train_y)]
+        self.residuals = np.subtract(train_y.values.flatten(), self.pred_insample)
 
 @dataclass
 class NaiveAVG(Forecast):
@@ -94,15 +124,13 @@ class NaiveAVG(Forecast):
             but time series has only {len(self.values)} elements"
         self._T = t
 
-    def predict(self, values: np.array, T: int, h: int, **kwargs) -> np.array:
+    def predict(self, values: np.array, **kwargs) -> np.array:
         """
         Predicts future values using naive average foreacsting.
 
         returns : np.array with time series values and forecast combined
         """
         self.values = values
-        self.T = T
-        self.h = h
 
         mean_value = np.mean(self.values[-self.T :])
         self.forecast = np.full(self.h, mean_value)
@@ -124,15 +152,16 @@ class NaiveLast(Forecast):
             h : forecast horizon
         """
         super().__init__(h)
+        
+   
 
-    def predict(self, values: np.array, h: int, **kwargs) -> np.array:
+    def predict(self, values: np.array, **kwargs) -> np.array:
         """
         Predicts future values using naive average foreacsting.
 
         returns : np.array with time series forecast
         """
         self.values = values
-        self.h = h
 
         self.forecast = np.full(self.h, self.values[-1])
         self.y = np.append(self.values, self.forecast)
@@ -168,15 +197,15 @@ class NaiveSeasonal(Forecast):
         #     lenght of provided values {len(self.values)}"
         self._k = k
 
-    def predict(self, values: np.array, h: int, k: int, **kwargs) -> np.array:
+    def predict(self, values: np.array, **kwargs) -> np.array:
         """
         Predicts future values using naive average foreacsting.
 
         returns : np.array with time series values and forecast combined
         """
         self.values = values
-        self.h = h
-        self.k = k
+        # self.h = h 
+        # self.k = k
 
         frc = copy.copy(self.values)
 
@@ -203,14 +232,14 @@ class NaiveDrift(Forecast):
         """
         super().__init__(h)
 
-    def predict(self, values: np.array, h: int, **kwargs) -> np.array:
+    def predict(self, values: np.array, **kwargs) -> np.array:
         """
         Predicts future values using naive average foreacsting.
 
         returns : np.array with time series values and forecast combined
         """
         self.values = values
-        self.h = h
+
         h_periods = np.linspace(1, self.h, self.h)
         h_trend = (self.values[-1] - self.values[0]) / len(self.values)
         self.forecast = np.add(np.multiply(h_trend, h_periods), self.values[-1])

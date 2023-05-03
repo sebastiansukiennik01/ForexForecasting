@@ -57,3 +57,11 @@ class ARIMA(Forecast):
         self.model_fit = self.model.fit()
 
         return self
+    
+    def get_residuals(self, train_y: np.ndarray, **kwargs):
+        
+        self.residuals = self.model_fit.resid
+        self.pred_insample = self.model_fit.predict()
+        self.pred_insample.iat[0], self.residuals.iat[0] =  self.residuals.values[0], self.pred_insample.iat[0] 
+        
+        return self.model_fit.resid

@@ -52,7 +52,8 @@ class TSCV:
         self.metrics = metrics  # list of metrics used in evaluating code results
         self.errors = []  # errors used to calcualate metrics
         self.residuals = []  # differences between train set labels and fitted values
-        self.metric_values = {}  # values of calculated metrics {metric_name: value}
+        self.error_metrics = {}  # values of calculated metrics {metric_name: value} for errors
+        self.resid_metrics = {}  # values of calculated metrics {metric_name: value} for residuals
         self.predicted = []  # predicted value for all test sets
         self.__post_init__()
 
@@ -71,7 +72,8 @@ class TSCV:
 
         self._clean_cache()
         self.model = model
-        split_metrics = {m.__name__: [] for m in self.metrics}
+        split_error_metrics = {m.__name__: [] for m in self.metrics}
+        split_resid_metrics = {m.__name__: [] for m in self.metrics}
 
         tscv = TimeSeriesSplit(
             n_splits=self.n_splits,
@@ -93,27 +95,26 @@ class TSCV:
             self.model.fit(train_X, train_y, **kwargs)
             predicted_y = self._predict(test_X=test_X, test_y=test_y, **kwargs)
 
-            # calculate errors and metrics
-            self._calculate_errors(true_y=test_y, pred_y=predicted_y)
-            [
-                split_metrics[m.__name__].append(
-                    m(y_true=test_y.values, y_pred=predicted_y)
-                )
-                for m in self.metrics
-            ]
+            # calculate residuals metrics, and errors metrics
+            split_error_metrics = self._calculate_error_metrics(prev_error_metrics=split_error_metrics, 
+                                                                test_y=test_y, 
+                                                                pred_y=predicted_y)
+        
+        # get residuals from last train set
+        split_resid_metrics = self._calculate_resid_metrics(prev_resid_metrics=split_resid_metrics,
+                                                            train_X=train_X,
+                                                            train_y=train_y)
 
-        self.residuals = self._calculate_residuals(train_X, train_y, **kwargs)
-        self.metric_values = {
-            fe: np.mean(values) for fe, values in split_metrics.items()
-        }
-
-        return self.metric_values
+        # mean of resisduals and errors metrics
+        self._average_metrics(split_resid_metrics, split_error_metrics)
+        
+        return self.resid_metrics, self.error_metrics
 
     def split_data(
         self, train_idx: list, test_idx: list, **kwargs
     ) -> tuple[pd.DataFrame]:
         """
-        Splits data using TimeSeriesSlits and transforms it.
+        Splits data using TimeSeriesSplits and transforms it.
         """
         norm_type = kwargs.pop("norm_type", "standarize")
 
@@ -161,7 +162,8 @@ class TSCV:
         """
         Cleans temporary values between TSCV runs.
         """
-        self.metric_values = {fe.__name__: [] for fe in self.metrics}
+        self.error_metrics = {fe.__name__: [] for fe in self.metrics}
+        self.resid_metrics = {fe.__name__: [] for fe in self.metrics}
         self.predicted = []
         self.errors = []
 
@@ -196,6 +198,58 @@ class TSCV:
         """
         true_y = true_y.values.flatten()
         self.errors.extend(np.subtract(true_y, pred_y))
-
+        
+    def _calculate_error_metrics(self, prev_error_metrics: dict, test_y: np.ndarray, pred_y: np.ndarray):
+        """
+        Calculates errors for predicted values, than metrics based on those errors and append them to 
+        current errors metrics.
+        args:
+            prev_error_metrics : dict of error metrics from previous splits (e.g. {'mape': [list of previous mape results]})
+            test_y : true label values
+            pred_y : predicted label values
+        return : dict of current metrics results for errors
+        """
+        self._calculate_errors(true_y=test_y, pred_y=pred_y)
+        [
+            prev_error_metrics[m.__name__].append(
+                m(y_true=test_y.values, y_pred=pred_y)
+            )
+            for m in self.metrics
+        ]
+        
+        return prev_error_metrics
+    
+    def _calculate_resid_metrics(self, prev_resid_metrics: dict, train_X: np.ndarray, train_y: np.ndarray):
+        """
+        Calculates residuals for train set values, than metrics based on those residuals and append them to 
+        current residuals metrics.
+        args:
+            prev_resid_metrics : dict of residuals metrics from previous splits 
+                (e.g. {'mape': [list of previous mape results]})
+            train_X : feature values
+            train_y : true label values
+        return : dict of current metrics results for residuals
+        """
+        self.model.get_residuals(train_X=train_X, train_y=train_y)
+        [
+            prev_resid_metrics[m.__name__].append(
+                m(y_true=train_y.values.flatten(), y_pred=self.model.pred_insample)
+            )
+            for m in self.metrics
+        ]
+        
+        return prev_resid_metrics
+    
+    def _average_metrics(self, split_resid_metrics: np.ndarray, split_error_metrics: np.ndarray):
+        """
+        Calculates average on all tracked metrics for residuals and errors.
+        """
+        self.error_metrics = {
+            fe: np.mean(values) for fe, values in split_error_metrics.items()
+        }
+        self.resid_metrics = {
+            fe: np.mean(values) for fe, values in split_resid_metrics.items()
+        } 
+        
     def __repr__(self) -> str:
         return f"TSCV(gap={self.gap}, n_splits={self.n_splits}, max_train_size={self.max_train_size}, test_size={self.test_size}, forecast_errors={self.forecast_errors})"
