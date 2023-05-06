@@ -152,9 +152,9 @@ def CNN_func(
     dense_0 = Dense(32, activation=activation)(flatten)
     dense_1 = Dense(1, activation='sigmoid')(dense_0)
     
-    model = Model(inputs=inp, outputs=dense_1)
+    # model = Model(inputs=inp, outputs=dense_1)
     
-    return model
+    return inp, dense_1
 
 
 def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, **kwargs):

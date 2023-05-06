@@ -36,7 +36,7 @@ class DataSet(object):
         Divides data into train, validation, test sets using specified ratios
         """
         # TODO add variables to whole dataset ?!
-        self.data = add_variables(self.data)
+        self.data = add_variables(self.data, both_labels=True)
 
         n = self.data.shape[0]
         train_idx = int(n * self._train_r)
@@ -136,13 +136,13 @@ class DataSet(object):
             # TODO
             ...
 
-    def add_variables(self) -> DataSet:
+    def add_variables(self, **kwargs) -> DataSet:
         """
         Adds variables to all datasets (train, validation and test)
         """
-        self.train = add_variables(self.train)
-        self.validation = add_variables(self.validation)
-        self.test = add_variables(self.test)
+        self.train = add_variables(self.train, **kwargs)
+        self.validation = add_variables(self.validation, **kwargs)
+        self.test = add_variables(self.test, **kwargs)
 
         return self
 
@@ -160,12 +160,13 @@ class DataSet(object):
         to_scale = to_scale.difference(self.label) if features_only else to_scale
         to_scale = list(to_scale)
 
-        self.test = self._normalize_small_set(self.test, scaler, to_scale)
+        # self.test = self._normalize_small_set(self.test, scaler, to_scale)
         if not self.validation.empty:
             self.validation[to_scale] = self._normalize_small_set(
                 self.validation[to_scale], scaler, to_scale
             )
         self.train[to_scale] = scaler().fit_transform(self.train[to_scale])
+        self.test[to_scale] = scaler().fit_transform(self.test[to_scale])
 
         return self
 

@@ -93,8 +93,8 @@ class LSTM_:
         return callbacks
 
 def LSTM_func(
-    nodes: str, 
-    activation: str
+    nodes: str = [64, 32, 32, 32],
+    activation: str = 'selu'
 ):
     model = tf.keras.models.Sequential([
         Lambda(lambda x: tf.expand_dims(x, axis=-1),
