@@ -2,9 +2,17 @@
 Module for CNN part of final neural network model
 """
 
+# from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 import random
+import datetime as dt
+import tensorflow as tf
+import numpy as np
+from keras import backend as K
+from keras.layers import Input, Dense, Flatten, Dropout, Layer, Conv1D, MaxPool1D
+from keras.models import Model
 
 import tensorflow as tf
 from keras.models import Sequential
@@ -18,8 +26,11 @@ from keras.layers import (
     Conv1D,
     MaxPool1D,
 )
+from keras.optimizers import Adam
+from keras.losses import BinaryCrossentropy
+from keras.metrics import accuracy
 from keras import backend as K
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, Callback
 
 from sklearn.preprocessing import StandardScaler
 
@@ -28,7 +39,125 @@ TRAIN_TEST_CUTOFF = "2016-04-21"
 TRAIN_VALID_RATIO = 0.75
 
 
-def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind):
+def f1macro(y_true: list, y_pred: list):
+    f_pos = f1_m(y_true, y_pred)
+    # negative version of the data and prediction
+    f_neg = f1_m(1 - y_true, 1 - K.clip(y_pred, 0, 1))
+    return (f_pos + f_neg) / 2
+
+    
+class CNN_:
+    def __init__(
+        self,
+        filters: int = 8,
+        kernel_size: int = 4,
+        pool_size: int = 2,
+        activation: str = "selu",
+        seq_len: int = 10,
+        n_features: int = 49,
+        target_col: str = "target_direction"
+    ):
+        self.model = CNN_func(
+            filters=filters,
+            kernel_size=kernel_size,
+            pool_size=pool_size,
+            activation=activation,
+            seq_len=seq_len,
+            n_features=n_features
+        )
+        self.seq_len = seq_len
+        self.n_features = n_features
+        self.target_col = target_col
+    
+    def compile(self,
+                optimizer=Adam(),
+                loss=BinaryCrossentropy(),
+                metrics=[accuracy, f1macro],
+                **kwargs):
+        self.model.compile(
+            optimizer=optimizer,
+            loss=loss,
+            metrics=metrics,
+            **kwargs)
+        
+    def fit(self,
+            data,
+            seq_len=10,
+            epochs=5,
+            steps_per_epoch=100,
+            batch_size=128,
+            callbacks=None,
+            verbose=1,
+            **kwargs):
+        """
+        Overrides built in fit method with custom deafault arguments
+        """
+        if not callbacks:
+            callbacks = self._default_callbacks()
+        #TODO FIX DATAGEN DIVIDING DATA
+        self.model.fit(
+            datagen(df=data, seq_len=seq_len, batch_size=batch_size, targetcol=["target_direction"], kind="train", **kwargs),
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+            batch_size=batch_size,
+            callbacks=callbacks,
+            verbose=verbose
+        )
+    
+    def predict(self, data):
+        """
+        Returns prediction
+        """
+        pred = self.model.predict(
+            testgen(data,
+                    seq_len=self.seq_len,
+                    targetcol=self.target_col)[0])
+        
+        return  map(int, pred.flatten()>0.5)
+    
+    def _default_callbacks(self) -> list[Callback]:
+        """
+        Returns list of deafault callbacks
+        """
+        checkpoint_path = f"./models/cnn/ccn-{dt.datetime.now().strftime('%m%d_%H%M%S')}-" + "{epoch}.h5"
+        callbacks = [
+            ModelCheckpoint(checkpoint_path,
+                            monitor='f1macro', 
+                            mode="max",
+                            verbose=0,
+                            save_best_only=True, 
+                            save_weights_only=False, 
+                            save_freq="epoch")
+        ]
+        return callbacks
+    
+    
+def CNN_func(
+        filters: int = 8,
+        kernel_size: int = 4,
+        pool_size: int = 2,
+        activation: str = "relu",
+        seq_len: int = 10,
+        n_features: int = 49):
+    
+    inp = tf.keras.layers.Input(shape=(seq_len, n_features, 1))
+    conv1D_0 = Conv2D(filters, kernel_size, activation=activation, padding="same")(inp)
+    max_pool_0 = MaxPool2D((pool_size, pool_size))(conv1D_0)
+    conv1D_1 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_0)
+    max_pool_1 = MaxPool2D((pool_size, pool_size))(conv1D_1)
+    conv1D_2 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_1)
+    max_pool_2 = MaxPool2D((pool_size, pool_size))(conv1D_2)
+    
+    flatten = Flatten()(max_pool_2)
+    dense_0 = Dense(32, activation=activation)(flatten)
+    dense_1 = Dense(1, activation='sigmoid')(dense_0)
+    
+    model = Model(inputs=inp, outputs=dense_1)
+    
+    return model
+
+
+def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, **kwargs):
     """
     As a generator to produce samples for Keras model
 
@@ -44,12 +173,14 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind):
         # Pick one dataframe from the pool
 
         input_cols = [c for c in df.columns if c not in targetcol]
-        index = df.index[df.index < TRAIN_TEST_CUTOFF]
-        split = int(len(index) * TRAIN_VALID_RATIO)
+        index = df.index
+        split = len(index)
+        
         if kind == "train":
             index = index[:split]  # range for the training set
         elif kind == "valid":
             index = index[split:]  # range for the validation set
+      
         # Pick one position, then clip a sequence length
         while True:
             t = random.choice(index)  # pick one time step
@@ -67,36 +198,19 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind):
             batch = []
 
 
-# def cnnpred_2d(seq_len=60, n_features=82, n_filters=(256, 256, 256), droprate=0.1):
-#     "2D-CNNpred model according to the paper"
-#     model = Sequential(
-#         [
-#             Input(shape=(seq_len, n_features, 1)),
-#             Conv2D(n_filters[0], kernel_size=(1, n_features), activation="sigmoid"),
-#             Conv2D(n_filters[1], kernel_size=(5, 1), activation="sigmoid"),
-#             MaxPool2D(pool_size=(2, 1)),
-#             Flatten(),
-#             Dropout(droprate),
-#             Dense(1, activation="sigmoid"),
-#         ]
-#     )
-#     return model
+def testgen(data: pd.DataFrame, seq_len: int, targetcol: list):
+    "Return array of all test samples"
+    batch = []
 
-
-def cnnpred_2d(seq_len=60, n_features=82, n_filters=(256, 256, 256), droprate=0.1):
-    "2D-CNNpred model according to the paper"
-    model = Sequential(
-        [
-            Input(shape=(seq_len, n_features, 1)),
-            Conv1D(10, kernel_size=16, activation="sigmoid", padding="same"),
-            Flatten(),
-            Dense(256, activation="sigmoid"),
-            Dense(128, activation="sigmoid"),
-            Dropout(droprate),
-            Dense(2, activation="softmax"),
-        ]
-    )
-    return model
+    input_cols = [c for c in data.columns if c not in targetcol]
+    # find the start of test sample
+    # t = data.index[data.index >= TRAIN_TEST_CUTOFF][0]
+    # n = (data.index == t).argmax()
+    for i in range(seq_len + 1, len(data) + 1):
+        frame = data.iloc[i - seq_len : i]
+        batch.append([frame[input_cols].values, frame[targetcol].values[-1]])
+    X, y = zip(*batch)
+    return np.expand_dims(np.array(X), 3), np.array(y)
 
 
 def scale_inputs(data: pd.DataFrame, targetcol: list) -> pd.DataFrame:
@@ -139,18 +253,3 @@ def f1macro(y_true: list, y_pred: list):
     # negative version of the data and prediction
     f_neg = f1_m(1 - y_true, 1 - K.clip(y_pred, 0, 1))
     return (f_pos + f_neg) / 2
-
-
-def testgen(data: pd.DataFrame, seq_len: int, targetcol: list):
-    "Return array of all test samples"
-    batch = []
-
-    input_cols = [c for c in data.columns if c not in targetcol]
-    # find the start of test sample
-    t = data.index[data.index >= TRAIN_TEST_CUTOFF][0]
-    n = (data.index == t).argmax()
-    for i in range(n + 1, len(data) + 1):
-        frame = data.iloc[i - seq_len : i]
-        batch.append([frame[input_cols].values, frame[targetcol].values[-1]])
-    X, y = zip(*batch)
-    return np.expand_dims(np.array(X), 3), np.array(y)
