@@ -11,7 +11,7 @@ import datetime as dt
 import tensorflow as tf
 import numpy as np
 from keras import backend as K
-from keras.layers import Input, Dense, Flatten, Dropout, Layer, Conv1D, MaxPool1D
+from keras.layers import Input, Dense, Flatten, Dropout, Layer, Conv1D, MaxPool1D, BatchNormalization
 from keras.models import Model
 
 import tensorflow as tf
@@ -132,16 +132,27 @@ class CNN_:
         return callbacks
     
     
-def CNN_func(
-        filters: int = 8,
-        kernel_size: int = 4,
-        pool_size: int = 2,
-        activation: str = "relu",
-        seq_len: int = 10,
-        n_features: int = 49):
+def CNN_func(n_features: int = 49, **kwargs):
+    """
+    Creates and returns CNN model created with functional API
+    args:
+        filters : number of filter in each kernel
+        kernel_size : size of square kernels
+        pool_size : size of pooling layers
+        activation : activation function
+        seq_len : sequence length used in each step
+    returns : tensorflow functional CNN model 
+    """
+    
+    filters = kwargs.pop('filters', 8)
+    kernel_size = kwargs.pop('kernel_size', 4)
+    pool_size = kwargs.pop('pool_size', 2)
+    activation = kwargs.pop('activation', 'selu')
+    seq_len = kwargs.pop('seq_len', 10)
     
     inp = tf.keras.layers.Input(shape=(seq_len, n_features, 1))
     conv1D_0 = Conv2D(filters, kernel_size, activation=activation, padding="same")(inp)
+    # batch_1 = BatchNormalization(axis=-1)(conv1D_0) # TODO for future testing
     max_pool_0 = MaxPool2D((pool_size, pool_size))(conv1D_0)
     conv1D_1 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_0)
     max_pool_1 = MaxPool2D((pool_size, pool_size))(conv1D_1)
@@ -169,6 +180,7 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, *
         kind : train/valid for depending on type of dataset needed
     """
     batch = []
+    i = seq_len
     while True:
         # Pick one dataframe from the pool
 
@@ -180,15 +192,23 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, *
             index = index[:split]  # range for the training set
         elif kind == "valid":
             index = index[split:]  # range for the validation set
-      
+        
+        
         # Pick one position, then clip a sequence length
         while True:
-            t = random.choice(index)  # pick one time step
+            """t = random.choice(index)  # pick one time step
             n = (df.index == t).argmax()  # find its position in the dataframe
             if n - seq_len + 1 < 0:
                 continue  # can't get enough data for one sequence length
             frame = df.iloc[n - seq_len + 1 : n + 1]
             batch.append([frame[input_cols].values, df.loc[t, targetcol]])
+            """
+            # NEW 
+            frame = df.iloc[i - seq_len : i]
+            t = df.index[i - 1]
+            i += 1
+            batch.append([frame[input_cols].values, df.loc[t, targetcol]])
+            
             break
         # if we get enough for a batch, dispatch
         if len(batch) == batch_size:
