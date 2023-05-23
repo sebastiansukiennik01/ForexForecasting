@@ -50,10 +50,10 @@ class CNN_:
     def __init__(
         self,
         filters: int = 8,
-        kernel_size: int = 4,
+        kernel_size: int = 8,
         pool_size: int = 2,
-        activation: str = "selu",
-        seq_len: int = 10,
+        activation: str = "tanh",
+        seq_len: int = 30,
         n_features: int = 49,
         target_col: str = "target_direction"
     ):
@@ -132,7 +132,7 @@ class CNN_:
         return callbacks
     
     
-def CNN_func(n_features: int = 49, **kwargs):
+def CNN_func(n_features: int = 49, functional: bool = False, **kwargs):
     """
     Creates and returns CNN model created with functional API
     args:
@@ -145,15 +145,16 @@ def CNN_func(n_features: int = 49, **kwargs):
     """
     
     filters = kwargs.pop('filters', 8)
-    kernel_size = kwargs.pop('kernel_size', 4)
+    kernel_size = kwargs.pop('kernel_size', 8)
     pool_size = kwargs.pop('pool_size', 2)
-    activation = kwargs.pop('activation', 'selu')
-    seq_len = kwargs.pop('seq_len', 10)
+    activation = kwargs.pop('activation', 'tanh')
+    seq_len = kwargs.pop('seq_len', 30)
     
     inp = tf.keras.layers.Input(shape=(seq_len, n_features, 1))
     conv1D_0 = Conv2D(filters, kernel_size, activation=activation, padding="same")(inp)
-    # batch_1 = BatchNormalization(axis=-1)(conv1D_0) # TODO for future testing
-    max_pool_0 = MaxPool2D((pool_size, pool_size))(conv1D_0)
+    batch_1 = tf.keras.layers.BatchNormalization(axis=-1)(conv1D_0) # TODO for future testing
+    max_pool_0 = MaxPool2D((pool_size, pool_size))(batch_1)
+    # max_pool_0 = MaxPool2D((pool_size, pool_size))(conv1D_0)
     conv1D_1 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_0)
     max_pool_1 = MaxPool2D((pool_size, pool_size))(conv1D_1)
     conv1D_2 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_1)
@@ -163,7 +164,8 @@ def CNN_func(n_features: int = 49, **kwargs):
     dense_0 = Dense(32, activation=activation)(flatten)
     dense_1 = Dense(1, activation='sigmoid')(dense_0)
     
-    # model = Model(inputs=inp, outputs=dense_1)
+    if not functional:
+        return Model(inputs=inp, outputs=dense_1)
     
     return inp, dense_1
 
@@ -179,8 +181,8 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, *
         targetcol : list of target columns
         kind : train/valid for depending on type of dataset needed
     """
-    batch = []
     i = seq_len
+    batch = []
     while True:
         # Pick one dataframe from the pool
 
@@ -228,9 +230,9 @@ def testgen(data: pd.DataFrame, seq_len: int, targetcol: list):
     # n = (data.index == t).argmax()
     for i in range(seq_len + 1, len(data) + 1):
         frame = data.iloc[i - seq_len : i]
-        batch.append([frame[input_cols].values, frame[targetcol].values[-1]])
-    X, y = zip(*batch)
-    return np.expand_dims(np.array(X), 3), np.array(y)
+        batch.append(frame[input_cols].values)
+    X = zip(*batch)
+    return np.expand_dims(np.array(batch), 3)
 
 
 def scale_inputs(data: pd.DataFrame, targetcol: list) -> pd.DataFrame:

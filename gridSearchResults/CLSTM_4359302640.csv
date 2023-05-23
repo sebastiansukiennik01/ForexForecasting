@@ -1,0 +1,2 @@
+,mean_absolute_percentage_error_sample,rmspe_sample,mean_absolute_percentage_error,rmspe,lstm_activatation,lstm_nodes,seq_len
+0,0.1670058,0.19088945,0.25439455344362955,0.2570333630149332,tanh,"[16, 32, 64, 128]",30

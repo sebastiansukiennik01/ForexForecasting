@@ -4,7 +4,7 @@ Contains time series cross-validation, unified for all forecasting methods.
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_absolute_percentage_error
+from sklearn.metrics import mean_absolute_percentage_error, mean_absolute_error
 
 from typing import Union
 
@@ -32,7 +32,7 @@ class TSCV:
         max_train_size: int = None,
         test_size: int = None,
         gap: int = 0,
-        metrics: list[callable] = [mean_absolute_percentage_error, rmspe],
+        metrics: list[callable] = [mean_absolute_percentage_error, rmspe, mean_absolute_error],
     ) -> None:
         """
         Takes dataset which is the same for all prediction methods.
@@ -93,7 +93,10 @@ class TSCV:
 
             # fit model and predict
             self.model.fit(train_X, train_y, **kwargs)
-            predicted_y = self._predict(test_X=test_X, test_y=test_y, **kwargs)
+            predicted_y = self._predict(test_X=test_X, 
+                                        test_y=test_y, 
+                                        train_X=train_X, 
+                                        **kwargs)
 
             # calculate residuals metrics, and errors metrics
             split_error_metrics = self._calculate_error_metrics(prev_error_metrics=split_error_metrics, 
@@ -138,6 +141,7 @@ class TSCV:
         self,
         test_X: np.ndarray,
         test_y: np.ndarray,
+        train_X: np.ndarray,
         extend_prediction: bool = True,
         **kwargs,
     ) -> np.ndarray:
@@ -148,11 +152,27 @@ class TSCV:
             test_y : label train set
         returns : numpy array of predicted values
         """
-
+        
         try:
             pred_y = self.model.predict(test_y, **kwargs)
         except ValueError:
-            pred_y = self.model.predict(test_X, **kwargs)
+            try:
+                pred_y = self.model.predict(test_X, **kwargs)
+            except TypeError:
+                # extend test set with previous observations from train such that 
+                # the whole test set is enough to produce 'test_size' number of predictions
+                seq_len = self.model.model.seq_len
+                n = seq_len + self.test_size
+                temp_test_X = pd.concat([train_X, test_X], axis=0).iloc[-n:]
+                pred_y = self.model.predict(temp_test_X, **kwargs)
+                
+        # pred_y is missing first 'seq_len' values, because they couldn't be predicted
+        # prepend prediction with real numbers with
+        if pred_y.shape[0] != test_y.shape[0]:
+            seq_len = self.model.model.seq_len
+            missing_pred = test_y.values[:seq_len].flatten() + np.random.uniform(-0.001, 0.001, seq_len)
+            pred_y = np.concatenate([missing_pred, pred_y])
+            
         if extend_prediction:
             self.predicted.extend(pred_y)
 
@@ -230,7 +250,9 @@ class TSCV:
             train_y : true label values
         return : dict of current metrics results for residuals
         """
+        print("\n[INFO] Calculating reisduals..\n")
         self.model.get_residuals(train_X=train_X, train_y=train_y)
+        self.residuals = self.model.residuals
         [
             prev_resid_metrics[m.__name__].append(
                 m(y_true=train_y.values.flatten(), y_pred=self.model.pred_insample)

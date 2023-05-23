@@ -10,7 +10,7 @@ import pandas as pd
 import datetime as dt
 import os
 from keras import backend as K
-from keras.layers import Dense, Lambda, Bidirectional, LSTM, Input, Layer
+from keras.layers import Dense, Lambda, Bidirectional, LSTM, Input, Layer, Dropout
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.losses import MeanAbsolutePercentageError
@@ -18,7 +18,7 @@ from keras.metrics import accuracy, MeanSquaredError, MeanAbsoluteError
 from keras.callbacks import ModelCheckpoint, Callback
 
 from ..forecast.naive import Forecast
-from ..forecast.cnn import datagen
+from ..forecast.cnn import datagen, testgen
 
 
 class LSTM_:
@@ -37,7 +37,7 @@ class LSTM_:
         self.target_col = target_col
         
     def compile(self,
-                optimizer=Adam(),
+                optimizer=Adam(learning_rate=0.0001, decay=1e-3),
                 loss=MeanAbsolutePercentageError(),
                 metrics=[MeanAbsoluteError()],
                 **kwargs):
@@ -86,12 +86,10 @@ class LSTM_:
         """
         Returns prediction data
         """
-        try:
-            data = data.drop(columns=[self.target_col])
-        except KeyError:
-            pass
         pred = self.model.predict(
-            data
+            testgen(data, 
+                    seq_len=10, 
+                    targetcol='target_value')
         )
         return pred.flatten()
         
@@ -101,7 +99,7 @@ class LSTM_:
         Returns list of deafault callbacks
         """
         callbacks = [
-            CheckpoinCallback(metric='mean_absolute_error')
+            CheckpoinCallback(metric='loss')
         ]
         return callbacks
     
@@ -156,9 +154,8 @@ def _lstm_datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, k
 
 
 def LSTM_func(
-    nodes: str = [64, 32, 32, 32],
-    activation: str = 'selu',
-    functional: bool = False
+    functional: bool = False,
+    **kwargs
 ):
     """
     Returns LSTM sequential (on default) model.
@@ -168,6 +165,9 @@ def LSTM_func(
         functional : weather to return functionl model, tuple of input and outut layers
     returns : either sequential or inout output of functional model
     """
+    nodes = kwargs.get('nodes', [64, 32, 32, 32])
+    activation = kwargs.get('activation', 'tanh')
+    
     model = tf.keras.models.Sequential([
         Lambda(lambda x: x),
         Bidirectional(LSTM(nodes[0], return_sequences=True)),
@@ -177,19 +177,22 @@ def LSTM_func(
         Dense(1, activation=activation),
     ])
     if functional:
-        return _convert_model_to_functional(seq_model=model)
+        return _convert_model_to_functional(seq_model=model, **kwargs)
 
     return model
 
-def _convert_model_to_functional(seq_model: Model) -> tuple[Layer]:
+
+def _convert_model_to_functional(seq_model: Model, **kwargs) -> tuple[Layer]:
     """
     Converts sequential model to functional one. Returns its input and output layers
     args:
         model : tensorflow sequential model
     returns: input, output layers of model
     """
+    seq_len = kwargs.get('seq_len', 10)
+    
     # input_layer = Input(batch_shape=seq_model.layers[0].input_shape)
-    input_layer = Input(batch_shape=(128, 10, 49))
+    input_layer = Input(batch_shape=(128, seq_len, 49))
 
     prev_layer = input_layer
     for layer in seq_model.layers:
@@ -224,5 +227,26 @@ class CheckpoinCallback(tf.keras.callbacks.Callback):
         models_results = [float(s.split('_')[1].replace('.h5', '')) for s in saved_models]
         if mae < min(models_results):
             print(f"\nNew lowest {self.metric}: {mae}")
-            checkpoint_path = f"models/clstm/mae_{mae}.h5"
+            checkpoint_path = f"models/clstm/{self.metric}_{mae}.h5"
             self.model.save(checkpoint_path)
+            
+class EarlyStopping(tf.keras.callbacks.EarlyStopping):
+    """
+    Custom early stoping callback
+    """
+    def __init__(self, monitor: str = "loss", min_delta: int = 0.1, patience: int = 2, mode: str = "auto", verbose: int = 1, restore_best_weights: bool = True):
+        super().__init__(
+            monitor=monitor,
+            min_delta=min_delta,
+            patience=patience,
+            mode=mode,
+            verbose=verbose,
+            restore_best_weights=restore_best_weights
+        )
+        
+    def on_epoch_end(self, epoch, logs=None):
+        """
+        On every epoch end checks if current model made significant increase in tracked
+        metrics, if not stopp training process early.
+        """
+        return super().on_epoch_end(epoch, logs)

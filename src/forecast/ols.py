@@ -56,8 +56,8 @@ class OLS(Forecast):
     
     def get_residuals(self, train_X: np.ndarray, train_y: np.ndarray, **kwargs):
         """ Calculates insample residuals """
-        self.h = self.h if hasattr(self, 'h') else 5
-        first_idx = self.k if hasattr(self, 'k') and self.k else 5
+        self.h = self.h if hasattr(self, 'h') else 250
+        first_idx = self.k if hasattr(self, 'k') and self.k else 250
         
         train_X = train_X.values
         train_y = train_y.values

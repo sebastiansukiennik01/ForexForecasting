@@ -14,7 +14,7 @@ import pandas as pd
 
 class GridSearch:
     def __init__(
-        self, model: Forecast, tscv: TSCV, params: dict, by: Union[list, str], p_count: int
+        self, model_class: Forecast, tscv: TSCV, params: dict, by: Union[list, str], p_count: int
     ) -> None:
         """
         Configure model, timeseries cross validation and parameters to be checked.
@@ -23,7 +23,7 @@ class GridSearch:
             tscv : configured time series cross validation object
             params : dictionary of paramaters to be checked {param_name: [val_a, val_b, ...], ...}
         """
-        self.model = model
+        self.model_class = model_class
         self.tscv = tscv
         self.params = params
         self._by = by
@@ -59,6 +59,7 @@ class GridSearch:
         #     pool.map(self._run, combinations)
         
         for comb in combinations:
+            self.model = self.model_class()
             results = self.tscv.run(self.model, **comb)
             self._save_results(results=results,
                                combination=comb)
@@ -74,6 +75,8 @@ class GridSearch:
         """
         f_path = self._get_file_path()
         res = {f"{k}_sample": v  for k, v in results[0].items()} | results[1] | combination
+        res = {k: str(v) if isinstance(v, list) else v 
+               for k, v in res.items()}
         curr_results = pd.DataFrame(res, index=[0])
         
         if os.path.exists(f_path):

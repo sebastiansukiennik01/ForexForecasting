@@ -108,7 +108,8 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     args:
         data : dataframe
     """
-    data.replace([np.inf, -np.inf, 0.0, 0], np.nan, inplace=True)
+    # data.replace([np.inf, -np.inf, 0.0, 0], np.nan, inplace=True)
+    data.replace([np.inf, -np.inf], np.nan, inplace=True)
     data = data.loc[~data.isna().any(axis=1), :]
 
     return data

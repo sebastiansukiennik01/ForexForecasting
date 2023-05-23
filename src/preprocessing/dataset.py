@@ -36,7 +36,7 @@ class DataSet(object):
         Divides data into train, validation, test sets using specified ratios
         """
         # TODO add variables to whole dataset ?!
-        self.data = add_variables(self.data, both_labels=True)
+        self.data = add_variables(self.data, both_labels=False)
 
         n = self.data.shape[0]
         train_idx = int(n * self._train_r)
@@ -155,6 +155,7 @@ class DataSet(object):
         scaler = {"standarize": StandardScaler, "min-max": MinMaxScaler}.get(
             how, "min-max"
         )
+        print("NORMALIZING DATA!!")
 
         to_scale = set(self.train.columns).difference(self._binary_columns())
         to_scale = to_scale.difference(self.label) if features_only else to_scale
