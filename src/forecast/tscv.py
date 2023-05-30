@@ -92,7 +92,7 @@ class TSCV:
             )
 
             # fit model and predict
-            self.model.fit(train_X, train_y, **kwargs)
+            # self.model.fit(train_X, train_y, **kwargs)
             predicted_y = self._predict(test_X=test_X, 
                                         test_y=test_y, 
                                         train_X=train_X, 

@@ -221,7 +221,7 @@ def CLSTM_func(nodes: list[int] = [32, 64], activation: str = "selu", **kwargs):
         seq_len : sequence length used in CNN module
     returns : tensorflow functional CNN-LSTM model
     """
-    seq_len = kwargs.pop('seq_len', 30)
+    seq_len = kwargs.pop('seq_len', 120)
     lstm_kwargs = _filter_kwargs(kwargs=kwargs, starts_with='lstm_')
     cnn_kwargs = _filter_kwargs(kwargs=kwargs, starts_with='cnn_')
     lstm_kwargs['seq_len'] = seq_len
@@ -267,7 +267,7 @@ def _CLSTM_datagen(df: pd.DataFrame, batch_size, targetcol: list, kind, **kwargs
         kind : train/valid for depending on type of dataset needed
     returns : inputs, output tuple
     """
-    seq_len = kwargs.get('seq_len', 30)
+    seq_len = kwargs.get('seq_len', 120)
     # cnn input has to be last batch_size-elements of seq_len length
     # lstm input can be the same?
     while True:
