@@ -113,23 +113,23 @@ class CLSTMModel:
     """
 
     def __init__(self, 
-                 nodes: list = [32, 64], 
+                 nodes: list = [128, 64], 
                  activation: str = "selu",
                  target_col: str = "target_value",
                  **kwargs) -> None:
         
-        self.seq_len = kwargs.get('seq_len', 30)
+        self.seq_len = kwargs.get('seq_len', 120)
         self.target_col = target_col
         self.model = CLSTM_func(
             nodes=nodes,
             activation=activation,
-            seq_len=self.seq_len,
+            # seq_len=self.seq_len,
             **kwargs
         )
 
     def compile(self,
-                optimizer=Adam(learning_rate=0.0001),
-                loss=MeanAbsoluteError(),
+                optimizer=Adam(learning_rate=0.0001, clipnorm=1.0, clipvalue=1),
+                loss=MeanAbsolutePercentageError(),
                 metrics=[RootMeanSquaredError()],
                 **kwargs):
         self.model.compile(
@@ -140,8 +140,8 @@ class CLSTMModel:
     
     def fit(self,
             data,
-            epochs=10,
-            steps_per_epoch=50,
+            epochs=20,
+            steps_per_epoch=100,
             batch_size=128,
             callbacks=None,
             verbose=1,
@@ -153,7 +153,7 @@ class CLSTMModel:
             callbacks = self._default_callbacks()
         self.model.fit(
             _CLSTM_datagen(df=data,
-                           seq_len=self.seq_len,
+                        #    seq_len=self.seq_len,
                            batch_size=batch_size,
                            targetcol=[self.target_col],
                            kind="train",
@@ -207,7 +207,7 @@ class CLSTMModel:
         """
         callbacks = [
             CheckpoinCallback(metric='loss'),
-            EarlyStopping(min_delta=0, patience=15, mode="min")
+            EarlyStopping(min_delta=0, patience=5, mode="min")
         ]
         return callbacks
 
@@ -236,8 +236,8 @@ def CLSTM_func(nodes: list[int] = [32, 64], activation: str = "selu", **kwargs):
     
     concat_1 = tf.keras.layers.concatenate([out1, out2])
     dense_1 = Dense(nodes[0], activation=activation)(concat_1)
-    batch_1 = tf.keras.layers.BatchNormalization(axis=-1)(dense_1) # TODO for future testing
-    dense_2 = Dense(nodes[1], activation=activation)(batch_1)
+    # batch_1 = tf.keras.layers.BatchNormalization(axis=-1)(dense_1) # TODO for future testing
+    dense_2 = Dense(nodes[1], activation=activation)(dense_1)
     dense_3 = Dense(1)(dense_2)
 
     model = Model(inputs=[inp1, inp2], outputs=dense_3)

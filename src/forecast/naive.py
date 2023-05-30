@@ -85,6 +85,7 @@ class Forecast(ABC):
 
     def get_residuals(self, train_y: np.ndarray, **kwargs):
         """ Calculates insample residuals """
+        print("\n CHANGED K FROM 5 TO 200!!! ")
         first_idx = self.k if hasattr(self, 'k') and self.k else 5
         pred_y = np.array(train_y[:first_idx])
         

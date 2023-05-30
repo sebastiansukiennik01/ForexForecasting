@@ -10,7 +10,7 @@ import pandas as pd
 import datetime as dt
 import os
 from keras import backend as K
-from keras.layers import Dense, Lambda, Bidirectional, LSTM, Input, Layer, Dropout
+from keras.layers import Dense, Lambda, Bidirectional, LSTM, Input, Layer, Dropout, BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.losses import MeanAbsolutePercentageError
@@ -170,10 +170,13 @@ def LSTM_func(
     
     model = tf.keras.models.Sequential([
         Lambda(lambda x: x),
-        Bidirectional(LSTM(nodes[0], return_sequences=True)),
-        Bidirectional(LSTM(nodes[1], return_sequences=True)),
-        Bidirectional(LSTM(nodes[2])),
-        Dense(nodes[3]),
+        LSTM(nodes[0], input_shape=(30, 49), return_sequences=True),
+        BatchNormalization(),
+        LSTM(nodes[1], return_sequences=True),
+        BatchNormalization(),
+        LSTM(nodes[2]),
+        Dense(nodes[3], activation=activation),
+        Dense(64, activation=activation),
         Dense(1, activation=activation),
     ])
     if functional:
@@ -189,7 +192,7 @@ def _convert_model_to_functional(seq_model: Model, **kwargs) -> tuple[Layer]:
         model : tensorflow sequential model
     returns: input, output layers of model
     """
-    seq_len = kwargs.get('seq_len', 10)
+    seq_len = kwargs.get('seq_len', 30)
     
     # input_layer = Input(batch_shape=seq_model.layers[0].input_shape)
     input_layer = Input(batch_shape=(128, seq_len, 49))
@@ -225,7 +228,7 @@ class CheckpoinCallback(tf.keras.callbacks.Callback):
             pass
         
         models_results = [float(s.split('_')[1].replace('.h5', '')) for s in saved_models]
-        if mae < min(models_results):
+        if len(models_results) == 0 or mae < min(models_results):
             print(f"\nNew lowest {self.metric}: {mae}")
             checkpoint_path = f"models/clstm/{self.metric}_{mae}.h5"
             self.model.save(checkpoint_path)

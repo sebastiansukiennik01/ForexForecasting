@@ -73,7 +73,7 @@ class LinearPlot(Plot):
         title = kwargs.pop("title", self.ax.get_title())
 
         self.ax.plot(
-            x, y, label=kwargs.pop("label", ""), color=kwargs.pop("color", None)
+            x, y, label=kwargs.pop("label", ""), color=kwargs.pop("color", None), **kwargs
         )
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)

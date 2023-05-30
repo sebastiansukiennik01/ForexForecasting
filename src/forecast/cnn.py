@@ -144,21 +144,21 @@ def CNN_func(n_features: int = 49, functional: bool = False, **kwargs):
     returns : tensorflow functional CNN model 
     """
     
-    filters = kwargs.pop('filters', 8)
+    filters = kwargs.pop('filters', 16)
     kernel_size = kwargs.pop('kernel_size', 8)
-    pool_size = kwargs.pop('pool_size', 2)
-    activation = kwargs.pop('activation', 'tanh')
+    pool_size = kwargs.pop('pool_size', 3)
+    activation = kwargs.pop('activation', 'selu')
     seq_len = kwargs.pop('seq_len', 30)
     
     inp = tf.keras.layers.Input(shape=(seq_len, n_features, 1))
     conv1D_0 = Conv2D(filters, kernel_size, activation=activation, padding="same")(inp)
     batch_1 = tf.keras.layers.BatchNormalization(axis=-1)(conv1D_0) # TODO for future testing
-    max_pool_0 = MaxPool2D((pool_size, pool_size))(batch_1)
-    # max_pool_0 = MaxPool2D((pool_size, pool_size))(conv1D_0)
+    max_pool_0 = MaxPool2D((pool_size, pool_size), padding='same')(batch_1)
+    # max_pool_0 = MaxPool2D((pool_size, pool_size), padding='same')(conv1D_0)
     conv1D_1 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_0)
-    max_pool_1 = MaxPool2D((pool_size, pool_size))(conv1D_1)
+    max_pool_1 = MaxPool2D((pool_size, pool_size), padding='same')(conv1D_1)
     conv1D_2 = Conv2D(filters, kernel_size, activation=activation, padding="same")(max_pool_1)
-    max_pool_2 = MaxPool2D((pool_size, pool_size))(conv1D_2)
+    max_pool_2 = MaxPool2D((pool_size, pool_size), padding='same')(conv1D_2)
     
     flatten = Flatten()(max_pool_2)
     dense_0 = Dense(32, activation=activation)(flatten)
@@ -198,18 +198,18 @@ def datagen(df: pd.DataFrame, seq_len: int, batch_size, targetcol: list, kind, *
         
         # Pick one position, then clip a sequence length
         while True:
-            """t = random.choice(index)  # pick one time step
+            t = random.choice(index)  # pick one time step
             n = (df.index == t).argmax()  # find its position in the dataframe
             if n - seq_len + 1 < 0:
                 continue  # can't get enough data for one sequence length
             frame = df.iloc[n - seq_len + 1 : n + 1]
             batch.append([frame[input_cols].values, df.loc[t, targetcol]])
-            """
-            # NEW 
-            frame = df.iloc[i - seq_len : i]
-            t = df.index[i - 1]
-            i += 1
-            batch.append([frame[input_cols].values, df.loc[t, targetcol]])
+            
+            # # NEW 
+            # frame = df.iloc[i - seq_len : i]
+            # t = df.index[i - 1]
+            # i += 1
+            # batch.append([frame[input_cols].values, df.loc[t, targetcol]])
             
             break
         # if we get enough for a batch, dispatch
