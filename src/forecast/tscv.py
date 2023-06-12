@@ -1,6 +1,7 @@
 """
 Contains time series cross-validation, unified for all forecasting methods.
 """
+import time
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
@@ -55,6 +56,10 @@ class TSCV:
         self.error_metrics = {}  # values of calculated metrics {metric_name: value} for errors
         self.resid_metrics = {}  # values of calculated metrics {metric_name: value} for residuals
         self.predicted = []  # predicted value for all test sets
+        self.fit_times = []
+        self.avg_fit_time: int
+        self.avg_pred_time: int
+        self.pred_times = []
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -92,7 +97,11 @@ class TSCV:
             )
 
             # fit model and predict
-            # self.model.fit(train_X, train_y, **kwargs)
+            
+            t1 = time.perf_counter()
+            self.model.fit(train_X, train_y, **kwargs)
+            self.fit_times.append(time.perf_counter() - t1)
+            
             predicted_y = self._predict(test_X=test_X, 
                                         test_y=test_y, 
                                         train_X=train_X, 
@@ -110,6 +119,7 @@ class TSCV:
 
         # mean of resisduals and errors metrics
         self._average_metrics(split_resid_metrics, split_error_metrics)
+        print(f"Average fit time: {self.avg_fit_time}, prediction time: {self.avg_pred_time}")
         
         return self.resid_metrics, self.error_metrics
 
@@ -153,6 +163,7 @@ class TSCV:
         returns : numpy array of predicted values
         """
         
+        t2 = time.perf_counter()
         try:
             pred_y = self.model.predict(test_y, **kwargs)
         except ValueError:
@@ -175,6 +186,7 @@ class TSCV:
             
         if extend_prediction:
             self.predicted.extend(pred_y)
+        self.pred_times.append(time.perf_counter() - t2)
 
         return pred_y
 
@@ -232,7 +244,7 @@ class TSCV:
         self._calculate_errors(true_y=test_y, pred_y=pred_y)
         [
             prev_error_metrics[m.__name__].append(
-                m(y_true=test_y.values, y_pred=pred_y)
+                m(y_true=test_y.values.flatten(), y_pred=pred_y)
             )
             for m in self.metrics
         ]
@@ -266,12 +278,15 @@ class TSCV:
         """
         Calculates average on all tracked metrics for residuals and errors.
         """
+        
         self.error_metrics = {
             fe: np.mean(values) for fe, values in split_error_metrics.items()
         }
         self.resid_metrics = {
             fe: np.mean(values) for fe, values in split_resid_metrics.items()
         } 
+        self.avg_fit_time = np.mean(self.fit_times)
+        self.avg_pred_time = np.mean(self.pred_times)
         
     def __repr__(self) -> str:
         return f"TSCV(gap={self.gap}, n_splits={self.n_splits}, max_train_size={self.max_train_size}, test_size={self.test_size}, forecast_errors={self.forecast_errors})"

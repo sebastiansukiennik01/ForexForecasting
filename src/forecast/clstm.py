@@ -140,7 +140,7 @@ class CLSTMModel:
     
     def fit(self,
             data,
-            epochs=20,
+            epochs=10,
             steps_per_epoch=100,
             batch_size=128,
             callbacks=None,

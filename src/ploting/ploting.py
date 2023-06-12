@@ -103,10 +103,14 @@ class BoxPlot(Plot):
         labels = kwargs.pop("labels", None)
         title = kwargs.pop("title", "")
         vert = kwargs.pop("vert", 1)
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
 
         self.ax.boxplot(y, vert=vert)
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
+        self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
+        self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
         if vert:
             self.ax.set_xticklabels(labels, fontdict=self.labels_font_dict)
         else:
@@ -235,11 +239,15 @@ class ACFPlot(Plot):
         partial = kwargs.pop("partial", False)
         zero = kwargs.pop("zero", False)
         alpha = kwargs.pop("alpha", 0.05)
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
 
         plot_f = plot_pacf if partial else plot_acf
         self.fig = plot_f(y, ax=self.ax, zero=zero, alpha=alpha)
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
+        self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
+        self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
 
         if self.legend:
             plt.legend()
