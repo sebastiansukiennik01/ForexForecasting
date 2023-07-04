@@ -7,6 +7,7 @@ import seaborn as sns
 from typing import Iterable
 import datetime as dt
 
+import statsmodels as sm
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 from abc import ABC, abstractmethod
@@ -47,6 +48,7 @@ class Plot(ABC):
         """
         Saves figure to 'images/" directory.
         """
+        print(f"saving: {file_name}")
         if file_name == "":
             file_name = dt.datetime.today().strftime("%Y%m%d_%H%M%S")
         file_name = file_name.lower().replace(" ", "_")
@@ -68,10 +70,10 @@ class LinearPlot(Plot):
         """
         xlabel = kwargs.pop("xlabel", None)
         ylabel = kwargs.pop("ylabel", None)
-        title = kwargs.pop("title", "")
+        title = kwargs.pop("title", self.ax.get_title())
 
         self.ax.plot(
-            x, y, label=kwargs.pop("label", ""), color=kwargs.pop("color", None)
+            x, y, label=kwargs.pop("label", ""), color=kwargs.pop("color", None), **kwargs
         )
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
@@ -101,10 +103,14 @@ class BoxPlot(Plot):
         labels = kwargs.pop("labels", None)
         title = kwargs.pop("title", "")
         vert = kwargs.pop("vert", 1)
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
 
         self.ax.boxplot(y, vert=vert)
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
+        self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
+        self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
         if vert:
             self.ax.set_xticklabels(labels, fontdict=self.labels_font_dict)
         else:
@@ -232,11 +238,50 @@ class ACFPlot(Plot):
         title = kwargs.pop("title", "")
         partial = kwargs.pop("partial", False)
         zero = kwargs.pop("zero", False)
+        alpha = kwargs.pop("alpha", 0.05)
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
 
         plot_f = plot_pacf if partial else plot_acf
-        self.fig = plot_f(y, ax=self.ax, zero=zero)
+        self.fig = plot_f(y, ax=self.ax, zero=zero, alpha=alpha)
         self.ax.set_title(title, fontdict=self.title_font_dict)
         self.ax.figure.set_size_inches(self.w, self.h)
+        self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
+        self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
+
+        if self.legend:
+            plt.legend()
+        self._save_figure(title)
+        return self.ax
+    
+    
+class QQPlot(Plot):
+    def __init__(
+        self,
+        legend: bool = True,
+        w: int = 10,
+        h: int = 4,
+        default_style: str = "default",
+        **kwargs,
+    ) -> None:
+        super().__init__(legend, w, h, default_style, **kwargs)
+
+    def plot(self, y: Iterable, **kwargs) -> plt.axes:
+        """
+        Plots Autocorellation Function graph
+        args:
+            y : iteravale data ploted onto Y axis
+        return : ax with ploted linear data
+        """
+        title = kwargs.pop("title", "")
+        xlabel = kwargs.pop("xlabel", None)
+        ylabel = kwargs.pop("ylabel", None)
+        
+        self.fig = sm.graphics.gofplots.qqplot(y, ax=self.ax, fit=True, line="45")
+        self.ax.set_title(title, fontdict=self.title_font_dict)
+        self.ax.figure.set_size_inches(self.w, self.h)
+        self.ax.set_xlabel(xlabel, fontdict=self.labels_font_dict)
+        self.ax.set_ylabel(ylabel, fontdict=self.labels_font_dict)
 
         if self.legend:
             plt.legend()
